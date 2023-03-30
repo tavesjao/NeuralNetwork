@@ -1,7 +1,7 @@
 import numpy as np
 import ipdb
 import matplotlib.pyplot as plt
-from utils import visualize_convergence, relu, sigmoid, tanh, relu_backward, sigmoid_backward, tanh_backward
+from utils import visualize_convergence, relu, sigmoid, tanh, relu_backward, sigmoid_backward, tanh_backward, load_data
 
 class NeuralNetwork:
     def __init__(self, sizes, activation, learning_rate=0.1, epochs=1000):
@@ -54,17 +54,19 @@ class NeuralNetwork:
         L = len(params) // 2
 
         for i in range(1, L):
-            A, cache = self.linear_activation_forward(A, params['W' + str(i)], params['b' + str(i)], activation='relu')
+            A_prev = A
+            A, cache = self.linear_activation_forward(A_prev, params['W' + str(i)], params['b' + str(i)], activation='relu')
             caches.append(cache)
 
         AL, cache = self.linear_activation_forward(A, params['W' + str(L)], params['b' + str(L)], activation='sigmoid')
         caches.append(cache)
+
         return AL, caches
 
-    def compute_cost(self, y_hat, y):
+    def compute_cost(self, AL, y):
         m = y.shape[0]
 
-        cost = -1/m * np.sum(y * np.log(y_hat) + (1 - y) * np.log(1 - y_hat), axis=1)
+        cost = -1/m * np.sum(y * np.log(AL) + (1 - y) * np.log(1 - AL), axis=1)
         return cost
 
     
@@ -102,7 +104,7 @@ class NeuralNetwork:
         L = len(caches)
         m = AL.shape[1]
         y = y.reshape(AL.shape)
-
+        
         dAL = - (np.divide(y, AL) - np.divide(1 - y, 1 - AL))
 
         dA_prev_temp, dW_temp, db_temp = self.linear_activation_backward(dAL, caches[L-1], 'sigmoid')
@@ -134,10 +136,11 @@ class NeuralNetwork:
         costs = []
 
         for i in range(self.epochs):
-            y_hat, caches = self.forward_propagation(X)
-            cost = self.compute_cost(y_hat, y)
-            grads = self.backward_propagation(y_hat, y.T, caches)
-            self.update_params(grads)
+            AL, caches = self.forward_propagation(X)
+            #ipdb.set_trace()
+            cost = self.compute_cost(AL, y)
+            grads = self.backward_propagation(AL, y, caches)
+            parameters = self.update_params(grads)
 
             if i % 100 == 0:
                 costs.append(cost)
@@ -145,43 +148,29 @@ class NeuralNetwork:
             
         visualize_convergence(costs, self.learning_rate, self.epochs)
 
-    def predict(self, X):
-        y_hat = self.forward_propagation(X)
-        return np.round(y_hat)
-    
-    def score(self, X, y):
-        y_hat = self.predict(X)
-        return np.mean(y_hat == y)
-    
-    def get_params(self):
-        return self.params
+    def predict(self, X, y, parameters):
+        m = X.shape[1]
+        n = len(parameters) // 2 # number of layers in the neural network
+        p = np.zeros((1,m))
         
-def main():
-    #from sklearn.datasets import load_diabetes
-    from sklearn.model_selection import train_test_split
-    from sklearn.preprocessing import StandardScaler
-    import pandas as pd
-    
-    data = pd.read_csv('diabetes.csv')
-    #ipdb.set_trace()
-    X = data.drop('Outcome', axis=1).values
-    y = data['Outcome'].values.reshape(-1, 1)
+        # Forward propagation
+        probas, caches = self.forward_propagation(X)
 
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-
-    scaler = StandardScaler()
-    X_train = scaler.fit_transform(X_train)
-    X_test = scaler.transform(X_test)
-
-    nn = NeuralNetwork([614, 8, 5, 2, 1], activation='relu', learning_rate=0.01, epochs=1000)
-
-    #ipdb.set_trace()
-    params = nn.get_params()
-    nn.fit(X_train, y_train)
-    print(nn.score(X_test, y_test))
-
-if __name__ == '__main__':
-    main()
+        
+        # convert probas to 0/1 predictions
+        for i in range(0, probas.shape[1]):
+            if probas[0,i] > 0.5:
+                p[0,i] = 1
+            else:
+                p[0,i] = 0
+        
+        #print results
+        print ("predictions: " + str(p))
+        print ("true labels: " + str(y))
+        print("Accuracy: "  + str(np.sum((p == y)/m)))
+            
+        return p
+     
 
         
 
