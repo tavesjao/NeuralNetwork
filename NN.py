@@ -4,27 +4,24 @@ import matplotlib.pyplot as plt
 from utils import visualize_convergence, relu, sigmoid, tanh, relu_backward, sigmoid_backward, tanh_backward, load_data
 
 class NeuralNetwork:
-    def __init__(self, sizes, activation, learning_rate=0.1, epochs=1000):
+    def __init__(self, sizes, learning_rate=0.1, epochs=1000):
         self.learning_rate = learning_rate
         self.epochs = epochs
         self.sizes = sizes
 
-        self.params = self.initialize_params(sizes)
-
-        self.cache = {}
 
     def initialize_params(self, sizes):
         params = {}
         L = len(sizes)
 
         for i in range(1, L):
-            params['W' + str(i)] = np.random.randn(sizes[i], sizes[i-1]) * 0.01
+            params['W' + str(i)] = np.random.randn(sizes[i], sizes[i-1]) / np.sqrt(sizes[i-1]) #* 0.01
             params['b' + str(i)] = np.zeros((sizes[i], 1))
 
         return params
     
     def linear_forward(self, A, W, b):
-        Z = (np.dot(W, A) + b)
+        Z = np.dot(W, A) + b
         cache = (A, W, b)
         return Z, cache
 
@@ -45,9 +42,7 @@ class NeuralNetwork:
 
         return A, cache
 
-    def forward_propagation(self, X):
-        params = self.params
-        cache = self.cache
+    def forward_propagation(self, X, params):
         caches = []
 
         A = X
@@ -66,7 +61,10 @@ class NeuralNetwork:
     def compute_cost(self, AL, y):
         m = y.shape[0]
 
-        cost = -1/m * np.sum(y * np.log(AL) + (1 - y) * np.log(1 - AL), axis=1)
+        cost = -1/m * np.sum(np.multiply(np.log(AL),y) + (1-y) * np.log(1-AL)) 
+        
+        cost = np.squeeze(cost)
+
         return cost
 
     
@@ -80,7 +78,7 @@ class NeuralNetwork:
 
         return dA_prev, dW, db
 
-    def linear_activation_backward(self, dA, cache, activation='relu'):
+    def linear_activation_backward(self, dA, cache, activation):
         
         linear_cache, activation_cache = cache
 
@@ -108,45 +106,44 @@ class NeuralNetwork:
         dAL = - (np.divide(y, AL) - np.divide(1 - y, 1 - AL))
 
         dA_prev_temp, dW_temp, db_temp = self.linear_activation_backward(dAL, caches[L-1], 'sigmoid')
-        grads[f"dA{L-1}"] = dA_prev_temp
-        grads[f"dW{L}"] = dW_temp
-        grads[f"db{L}"] = db_temp
+        grads["dA" + str(L-1)] = dA_prev_temp
+        grads["dW" + str(L)] = dW_temp
+        grads["db" + str(L)] = db_temp
 
         for l in reversed(range(L-1)):
             current_cache = caches[l]
             dA_prev_temp, dW_temp, db_temp = self.linear_activation_backward(dA_prev_temp, current_cache, 'relu')
-            grads[f"dA{l}"] = dA_prev_temp
-            grads[f"dW{l+1}"] = dW_temp
-            grads[f"db{l+1}"] = db_temp
+            grads["dA" + str(l)] = dA_prev_temp
+            grads["dW" + str(l+1)] = dW_temp
+            grads["db" + str(l+1)] = db_temp
 
         return grads
   
-    def update_params(self, grads):
-        params = self.params
+    def update_params(self, grads, params):
 
         L = len(params) // 2
 
-        for i in range(1, len(params) // 2 + 1):
-            params['W' + str(i)] = params['W' + str(i)] - self.learning_rate * grads['dW' + str(i)]
-            params['b' + str(i)] = params['b' + str(i)] - self.learning_rate * grads['db' + str(i)]
+        for i in range(L):
+            params['W' + str(i+1)] = params['W' + str(i+1)] - self.learning_rate * grads['dW' + str(i+1)]
+            params['b' + str(i+1)] = params['b' + str(i+1)] - self.learning_rate * grads['db' + str(i+1)]
 
         return params
 
     def fit(self, X, y):
         costs = []
-
+        parameters = self.initialize_params(self.sizes)
         for i in range(self.epochs):
-            AL, caches = self.forward_propagation(X)
-            #ipdb.set_trace()
+            AL, caches = self.forward_propagation(X, parameters)
             cost = self.compute_cost(AL, y)
             grads = self.backward_propagation(AL, y, caches)
-            parameters = self.update_params(grads)
+            parameters = self.update_params(grads, parameters)
 
             if i % 100 == 0:
                 costs.append(cost)
                 print('Epoch: {}, Cost: {}'.format(i, cost))
             
         visualize_convergence(costs, self.learning_rate, self.epochs)
+        return parameters
 
     def predict(self, X, y, parameters):
         m = X.shape[1]
@@ -154,7 +151,7 @@ class NeuralNetwork:
         p = np.zeros((1,m))
         
         # Forward propagation
-        probas, caches = self.forward_propagation(X)
+        probas, caches = self.forward_propagation(X, parameters)
 
         
         # convert probas to 0/1 predictions
@@ -172,8 +169,39 @@ class NeuralNetwork:
         return p
      
 
-        
 
+def main():
+    X_train, y_train, X_test, y_test, classes = load_data()
+    #print shapes of the data
+    print ("number of training examples = " + str(X_train.shape[0]))
+    print ("number of test examples = " + str(X_test.shape[0]))
+    print ("X_train shape: " + str(X_train.shape))
+    print ("y_train shape: " + str(y_train.shape))
+    print ("X_test shape: " + str(X_test.shape))
+    print ("y_test shape: " + str(y_test.shape))
+
+    # Reshape the training and test examples
+    train_x_flatten = X_train.reshape(X_train.shape[0], -1).T   # The "-1" makes reshape flatten the remaining dimensions
+    test_x_flatten = X_test.reshape(X_test.shape[0], -1).T
+    
+
+    # Standardize data to have feature values between 0 and 1.
+    from sklearn.preprocessing import StandardScaler
+    scaler = StandardScaler()
+    train_x = scaler.fit_transform(train_x_flatten.T).T
+    test_x = scaler.transform(test_x_flatten.T).T
+
+    print ("train_x's shape: " + str(train_x.shape))
+    print ("test_x's shape: " + str(test_x.shape))
+
+    model = NeuralNetwork([12288, 20, 7, 5, 1], 0.00075, 5000)
+
+
+    parameters = model.fit(train_x, y_train)
+    model.predict(test_x, y_test, parameters)
+
+if __name__ == '__main__':
+    main()
 
 
 
