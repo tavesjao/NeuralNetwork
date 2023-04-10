@@ -142,6 +142,8 @@ class NeuralNetwork:
                 costs.append(cost)
                 print('Epoch: {}, Cost: {}'.format(i, cost))
 
+        visualize_convergence(costs, self.learning_rate, self.epochs)
+
         return parameters
 
     def predict(self, X, y, parameters):
