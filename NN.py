@@ -141,8 +141,7 @@ class NeuralNetwork:
             if i % 100 == 0:
                 costs.append(cost)
                 print('Epoch: {}, Cost: {}'.format(i, cost))
-            
-        visualize_convergence(costs, self.learning_rate, self.epochs)
+
         return parameters
 
     def predict(self, X, y, parameters):
@@ -162,47 +161,9 @@ class NeuralNetwork:
                 p[0,i] = 0
         
         #print results
-        print ("predictions: " + str(p))
-        print ("true labels: " + str(y))
-        print("Accuracy: "  + str(np.sum((p == y)/m)))
+        accuracy = str(np.sum((p == y)/m))
             
-        return p
-     
-
-
-def main():
-    X_train, y_train, X_test, y_test, classes = load_data()
-    #print shapes of the data
-    print ("number of training examples = " + str(X_train.shape[0]))
-    print ("number of test examples = " + str(X_test.shape[0]))
-    print ("X_train shape: " + str(X_train.shape))
-    print ("y_train shape: " + str(y_train.shape))
-    print ("X_test shape: " + str(X_test.shape))
-    print ("y_test shape: " + str(y_test.shape))
-
-    # Reshape the training and test examples
-    train_x_flatten = X_train.reshape(X_train.shape[0], -1).T   # The "-1" makes reshape flatten the remaining dimensions
-    test_x_flatten = X_test.reshape(X_test.shape[0], -1).T
-    
-
-    # Standardize data to have feature values between 0 and 1.
-    from sklearn.preprocessing import StandardScaler
-    scaler = StandardScaler()
-    train_x = scaler.fit_transform(train_x_flatten.T).T
-    test_x = scaler.transform(test_x_flatten.T).T
-
-    print ("train_x's shape: " + str(train_x.shape))
-    print ("test_x's shape: " + str(test_x.shape))
-
-    model = NeuralNetwork([12288, 20, 7, 5, 1], 0.00075, 5000)
-
-
-    parameters = model.fit(train_x, y_train)
-    model.predict(test_x, y_test, parameters)
-
-if __name__ == '__main__':
-    main()
-
+        return accuracy
 
 
 
